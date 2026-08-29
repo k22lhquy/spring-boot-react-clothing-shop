@@ -1,10 +1,8 @@
 package com.shop.controller;
 
 import com.shop.dto.ApiResponse;
-import com.shop.model.Product;
 import com.shop.model.Review;
-import com.shop.repository.ProductRepository;
-import com.shop.repository.ReviewRepository;
+import com.shop.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,14 +15,11 @@ import java.util.List;
 public class ReviewController {
 
     @Autowired
-    private ReviewRepository reviewRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
+    private StorageService storageService;
 
     @GetMapping("/product/{productId}")
     public ResponseEntity<?> getProductReviews(@PathVariable String productId) {
-        List<Review> reviews = reviewRepository.findByProductIdOrderByCreatedAtDesc(productId);
+        List<Review> reviews = storageService.getProductReviews(productId);
         return ResponseEntity.ok(ApiResponse.ok(reviews));
     }
 
@@ -35,15 +30,15 @@ public class ReviewController {
         }
 
         review.setCreatedAt(new Date());
-        Review saved = reviewRepository.save(review);
+        Review saved = storageService.saveReview(review);
 
-        // Update product average rating
-        productRepository.findById(review.getProductId()).ifPresent(product -> {
-            List<Review> allReviews = reviewRepository.findByProductIdOrderByCreatedAtDesc(review.getProductId());
+        // Update product rating
+        storageService.getProductById(review.getProductId()).ifPresent(product -> {
+            List<Review> allReviews = storageService.getProductReviews(review.getProductId());
             double avgRating = allReviews.stream().mapToInt(Review::getRating).average().orElse(5.0);
             product.setRating(Math.round(avgRating * 10.0) / 10.0);
             product.setReviewCount(allReviews.size());
-            productRepository.save(product);
+            storageService.saveProduct(product);
         });
 
         return ResponseEntity.ok(ApiResponse.ok("Cảm ơn bạn đã gửi đánh giá!", saved));

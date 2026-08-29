@@ -5,9 +5,7 @@ import com.shop.dto.OrderRequest;
 import com.shop.model.Order;
 import com.shop.model.OrderItem;
 import com.shop.model.Voucher;
-import com.shop.repository.OrderRepository;
-import com.shop.repository.ProductRepository;
-import com.shop.repository.VoucherRepository;
+import com.shop.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +18,7 @@ import java.util.List;
 public class OrderController {
 
     @Autowired
-    private OrderRepository orderRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
-    private VoucherRepository voucherRepository;
+    private StorageService storageService;
 
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody OrderRequest request, @RequestParam(required = false) String userId) {
@@ -41,7 +33,7 @@ public class OrderController {
 
         double discountAmount = 0.0;
         if (request.getVoucherCode() != null && !request.getVoucherCode().trim().isEmpty()) {
-            var voucherOpt = voucherRepository.findByCodeAndActiveTrue(request.getVoucherCode().trim().toUpperCase());
+            var voucherOpt = storageService.getVoucherByCode(request.getVoucherCode().trim().toUpperCase());
             if (voucherOpt.isPresent()) {
                 Voucher v = voucherOpt.get();
                 if (subtotal >= v.getMinOrderAmount()) {
@@ -70,14 +62,14 @@ public class OrderController {
         order.setStatus("PENDING");
         order.setCreatedAt(new Date());
 
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder = storageService.saveOrder(order);
 
         // Update product stock
         for (OrderItem item : request.getItems()) {
-            productRepository.findById(item.getProductId()).ifPresent(product -> {
+            storageService.getProductById(item.getProductId()).ifPresent(product -> {
                 int newStock = Math.max(0, product.getStockQuantity() - item.getQuantity());
                 product.setStockQuantity(newStock);
-                productRepository.save(product);
+                storageService.saveProduct(product);
             });
         }
 
@@ -86,20 +78,22 @@ public class OrderController {
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserOrders(@PathVariable String userId) {
-        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<Order> orders = storageService.getOrdersByUserId(userId);
         return ResponseEntity.ok(ApiResponse.ok(orders));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getOrderById(@PathVariable String id) {
-        return orderRepository.findById(id)
+        return storageService.getAllOrders().stream()
+                .filter(o -> o.getId().equals(id))
+                .findFirst()
                 .map(order -> ResponseEntity.ok(ApiResponse.ok(order)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<?> cancelOrder(@PathVariable String id) {
-        var orderOpt = orderRepository.findById(id);
+        var orderOpt = storageService.getAllOrders().stream().filter(o -> o.getId().equals(id)).findFirst();
         if (orderOpt.isEmpty()) return ResponseEntity.notFound().build();
 
         Order order = orderOpt.get();
@@ -108,7 +102,7 @@ public class OrderController {
         }
 
         order.setStatus("CANCELLED");
-        orderRepository.save(order);
+        storageService.saveOrder(order);
         return ResponseEntity.ok(ApiResponse.ok("Đã hủy đơn hàng thành công", order));
     }
 }

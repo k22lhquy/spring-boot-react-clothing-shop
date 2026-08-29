@@ -5,9 +5,8 @@ import com.shop.dto.JwtResponse;
 import com.shop.dto.LoginRequest;
 import com.shop.dto.RegisterRequest;
 import com.shop.model.User;
-import com.shop.repository.UserRepository;
 import com.shop.security.JwtUtils;
-import com.shop.service.InMemoryStore;
+import com.shop.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,11 +18,8 @@ import java.util.Optional;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired(required = false)
-    private UserRepository userRepository;
-
     @Autowired
-    private InMemoryStore inMemoryStore;
+    private StorageService storageService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -38,23 +34,13 @@ public class AuthController {
         }
 
         String targetEmail = loginRequest.getEmail().trim().toLowerCase();
-        User user = null;
+        Optional<User> userOpt = storageService.findUserByEmail(targetEmail);
 
-        try {
-            Optional<User> userOpt = userRepository.findByEmail(targetEmail);
-            if (userOpt.isPresent()) user = userOpt.get();
-        } catch (Exception e) {}
-
-        if (user == null) {
-            user = inMemoryStore.users.values().stream()
-                    .filter(u -> u.getEmail().trim().equalsIgnoreCase(targetEmail))
-                    .findFirst().orElse(null);
-        }
-
-        if (user == null) {
+        if (userOpt.isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Email hoặc mật khẩu không chính xác"));
         }
 
+        User user = userOpt.get();
         boolean matches = false;
         if (user.getPassword() != null) {
             if (user.getPassword().equalsIgnoreCase(loginRequest.getPassword().trim())) {
@@ -78,8 +64,11 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+        if (storageService.findUserByEmail(registerRequest.getEmail().trim()).isPresent()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Email này đã được sử dụng!"));
+        }
+
         User user = new User();
-        user.setId("u_" + System.currentTimeMillis());
         user.setUsername(registerRequest.getUsername() != null ? registerRequest.getUsername() : registerRequest.getEmail());
         user.setEmail(registerRequest.getEmail().trim().toLowerCase());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
@@ -88,27 +77,20 @@ public class AuthController {
         user.setAddress(registerRequest.getAddress());
         user.setRole("ROLE_USER");
 
-        try {
-            userRepository.save(user);
-        } catch (Exception e) {
-            inMemoryStore.users.put(user.getId(), user);
-        }
+        User saved = storageService.saveUser(user);
 
-        String token = jwtUtils.generateToken(user.getUsername(), user.getRole(), user.getId());
-        JwtResponse jwtResponse = new JwtResponse(token, user.getId(), user.getUsername(), user.getEmail(), user.getFullName(), user.getRole());
+        String token = jwtUtils.generateToken(saved.getUsername(), saved.getRole(), saved.getId());
+        JwtResponse jwtResponse = new JwtResponse(token, saved.getId(), saved.getUsername(), saved.getEmail(), saved.getFullName(), saved.getRole());
 
         return ResponseEntity.ok(ApiResponse.ok("Đăng ký tài khoản thành công", jwtResponse));
     }
 
     @GetMapping("/profile/{userId}")
     public ResponseEntity<?> getProfile(@PathVariable String userId) {
-        try {
-            var opt = userRepository.findById(userId);
-            if (opt.isPresent()) return ResponseEntity.ok(ApiResponse.ok(opt.get()));
-        } catch (Exception e) {}
-
-        User u = inMemoryStore.users.get(userId);
-        if (u != null) return ResponseEntity.ok(ApiResponse.ok(u));
-        return ResponseEntity.notFound().build();
+        return storageService.getAllProducts().stream()
+                .filter(u -> u.getId().equals(userId))
+                .findFirst()
+                .map(user -> ResponseEntity.ok(ApiResponse.ok(user)))
+                .orElse(ResponseEntity.notFound().build());
     }
 }

@@ -2,7 +2,7 @@ package com.shop.controller;
 
 import com.shop.dto.ApiResponse;
 import com.shop.model.Voucher;
-import com.shop.repository.VoucherRepository;
+import com.shop.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,11 +14,11 @@ import java.util.Optional;
 public class VoucherController {
 
     @Autowired
-    private VoucherRepository voucherRepository;
+    private StorageService storageService;
 
     @GetMapping("/validate")
     public ResponseEntity<?> validateVoucher(@RequestParam String code, @RequestParam double orderAmount) {
-        Optional<Voucher> voucherOpt = voucherRepository.findByCodeAndActiveTrue(code.toUpperCase().trim());
+        Optional<Voucher> voucherOpt = storageService.getVoucherByCode(code.toUpperCase().trim());
         if (voucherOpt.isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Mã giảm giá không tồn tại hoặc đã hết hạn!"));
         }

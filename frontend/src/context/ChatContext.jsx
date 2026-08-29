@@ -4,8 +4,6 @@ import { apiFetch } from '../services/api';
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
-  const [messages, setMessages] = useState([]);
-  const [isOpen, setIsOpen] = useState(false);
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('shop_chat_session');
     if (!id) {
@@ -15,47 +13,71 @@ export const ChatProvider = ({ children }) => {
     return id;
   });
 
+  const [messages, setMessages] = useState(() => {
+    const cached = localStorage.getItem(`shop_chat_msgs_${sessionId}`);
+    return cached ? JSON.parse(cached) : [
+      {
+        sessionId,
+        senderId: 'BOT',
+        senderName: 'Trợ Lý Trends',
+        message: 'Xin chào! Shop Trends sẵn sàng hỗ trợ bạn. Bạn cần tư vấn về áo quần hay size nào ạ?',
+        isFromAdmin: true,
+        timestamp: new Date().toISOString(),
+      }
+    ];
+  });
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(`shop_chat_msgs_${sessionId}`, JSON.stringify(messages));
+  }, [messages, sessionId]);
+
   const fetchMessages = async () => {
     try {
       const res = await apiFetch(`/chat/messages/${sessionId}`);
-      if (res.success && res.data) {
+      if (res.success && res.data && res.data.length > 0) {
         setMessages(res.data);
       }
-    } catch (err) {
-      console.error('Failed to fetch chat history', err);
-    }
+    } catch (err) {}
   };
 
   useEffect(() => {
     if (isOpen) {
       fetchMessages();
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
     }
-  }, [isOpen, sessionId]);
+  }, [isOpen]);
 
   const sendMessage = async (text, senderName = 'Khách Hàng', isFromAdmin = false) => {
     if (!text.trim()) return;
 
-    // Optimistic UI update
-    const tempMsg = {
+    const userMsg = {
       sessionId,
       senderId: 'user',
       senderName,
       message: text,
-      isFromAdmin,
+      isFromAdmin: false,
       timestamp: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempMsg]);
+
+    setMessages((prev) => [...prev, userMsg]);
+    setIsTyping(true);
 
     try {
       await apiFetch('/chat/send', {
         method: 'POST',
-        body: JSON.stringify(tempMsg),
+        body: JSON.stringify(userMsg),
       });
-      fetchMessages();
+
+      // Fetch auto-bot response after 600ms typing delay
+      setTimeout(async () => {
+        await fetchMessages();
+        setIsTyping(false);
+      }, 600);
+
     } catch (err) {
-      console.error('Error sending message', err);
+      setIsTyping(false);
     }
   };
 
@@ -68,6 +90,7 @@ export const ChatProvider = ({ children }) => {
         sessionId,
         sendMessage,
         fetchMessages,
+        isTyping,
       }}
     >
       {children}

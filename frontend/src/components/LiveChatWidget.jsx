@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User, Sparkles, PhoneCall } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Sparkles } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
 export const LiveChatWidget = () => {
-  const { messages, isOpen, setIsOpen, sendMessage } = useChat();
+  const { messages, isOpen, setIsOpen, sendMessage, isTyping } = useChat();
   const [inputMsg, setInputMsg] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -13,7 +13,7 @@ export const LiveChatWidget = () => {
 
   useEffect(() => {
     if (isOpen) scrollToBottom();
-  }, [messages, isOpen]);
+  }, [messages, isOpen, isTyping]);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -154,13 +154,6 @@ export const LiveChatWidget = () => {
               background: '#0e121c',
             }}
           >
-            {messages.length === 0 && (
-              <div style={{ textAlign: 'center', margin: 'auto', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                <Sparkles size={32} color="var(--primary-color)" style={{ marginBottom: '8px' }} />
-                <p>Xin chào! Shop Trends có thể giúp gì cho bạn hôm nay?</p>
-              </div>
-            )}
-
             {messages.map((msg, index) => (
               <div
                 key={index}
@@ -171,7 +164,7 @@ export const LiveChatWidget = () => {
               >
                 <div
                   style={{
-                    maxWidth: '82%',
+                    maxWidth: '84%',
                     padding: '10px 14px',
                     borderRadius: '16px',
                     background: msg.isFromAdmin ? 'var(--bg-secondary)' : 'var(--accent-gradient)',
@@ -182,12 +175,20 @@ export const LiveChatWidget = () => {
                   }}
                 >
                   <div style={{ fontSize: '0.7rem', opacity: 0.8, marginBottom: '2px', fontWeight: 700 }}>
-                    {msg.senderName || (msg.isFromAdmin ? 'Shop Assistant' : 'Bạn')}
+                    {msg.senderName || (msg.isFromAdmin ? 'Trợ Lý Trends' : 'Bạn')}
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
                 </div>
               </div>
             ))}
+
+            {isTyping && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '8px 12px', borderRadius: '16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sparkles size={14} color="var(--primary-color)" /> Trợ lý Trends đang soạn tin...
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
