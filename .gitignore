@@ -1,0 +1,18 @@
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# Java / Maven / Backend
+target/
+*.class
+*.jar
+apache-maven-3.9.6/
+maven.zip
+
+# IDE & OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
