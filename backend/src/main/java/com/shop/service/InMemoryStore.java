@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Component
 public class InMemoryStore {
@@ -23,9 +22,8 @@ public class InMemoryStore {
 
     private void initDefaultData() {
         // Users
-        User admin = new User("admin", "admin@shop.com", "$2a$10$wS2Wb1B1yXb.5lC4UeX3d.0aZtP6zK9x1n3m5k7p9q0r1s2t3u4v5", "Quản Trị Viên Shop", "ROLE_ADMIN");
+        User admin = new User("admin", "admin@shop.com", "admin123", "Quản Trị Viên Shop", "ROLE_ADMIN");
         admin.setId("u_admin");
-        admin.setPassword("$2a$10$EblZqNptyYvcLmEw7V.v8eK0o0dO.1d01VpG2l12345678901234"); // BCrypt for admin123
         users.put(admin.getId(), admin);
 
         User customer = new User("customer", "user@shop.com", "user123", "Nguyễn Văn Hùng", "ROLE_USER");

@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.Optional;
 
 @RestController
@@ -34,15 +33,21 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        if (loginRequest.getEmail() == null || loginRequest.getPassword() == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Vui lòng nhập đầy đủ email và mật khẩu"));
+        }
+
+        String targetEmail = loginRequest.getEmail().trim().toLowerCase();
         User user = null;
+
         try {
-            Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
+            Optional<User> userOpt = userRepository.findByEmail(targetEmail);
             if (userOpt.isPresent()) user = userOpt.get();
         } catch (Exception e) {}
 
         if (user == null) {
             user = inMemoryStore.users.values().stream()
-                    .filter(u -> u.getEmail().equalsIgnoreCase(loginRequest.getEmail()))
+                    .filter(u -> u.getEmail().trim().equalsIgnoreCase(targetEmail))
                     .findFirst().orElse(null);
         }
 
@@ -50,12 +55,18 @@ public class AuthController {
             return ResponseEntity.badRequest().body(ApiResponse.error("Email hoặc mật khẩu không chính xác"));
         }
 
-        boolean passwordMatches = false;
-        try {
-            passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), user.getPassword());
-        } catch (Exception e) {}
+        boolean matches = false;
+        if (user.getPassword() != null) {
+            if (user.getPassword().equalsIgnoreCase(loginRequest.getPassword().trim())) {
+                matches = true;
+            } else {
+                try {
+                    matches = passwordEncoder.matches(loginRequest.getPassword().trim(), user.getPassword());
+                } catch (Exception e) {}
+            }
+        }
 
-        if (!passwordMatches && !user.getPassword().equals(loginRequest.getPassword())) {
+        if (!matches) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Email hoặc mật khẩu không chính xác"));
         }
 
@@ -70,7 +81,7 @@ public class AuthController {
         User user = new User();
         user.setId("u_" + System.currentTimeMillis());
         user.setUsername(registerRequest.getUsername() != null ? registerRequest.getUsername() : registerRequest.getEmail());
-        user.setEmail(registerRequest.getEmail());
+        user.setEmail(registerRequest.getEmail().trim().toLowerCase());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setFullName(registerRequest.getFullName());
         user.setPhone(registerRequest.getPhone());
